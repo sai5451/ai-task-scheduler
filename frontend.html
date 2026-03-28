@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Student Task Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --bg:#07090f; --surface:#0d1018; --card:#111520; --card2:#161b28;
+  --border:#1d2535; --border2:#253044; --accent:#2de8a2; --accent2:#4a8fff;
+  --accent3:#f0a030; --warn:#ff5f5f; --soft:#7a90b8; --text:#d8e6ff;
+  --text2:#a8bcdc; --mono:'DM Mono',monospace; --sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(45,232,162,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(45,232,162,.025) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0;}
+.blob{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(60px);}
+.blob1{width:500px;height:500px;top:-150px;left:-150px;background:radial-gradient(circle,rgba(45,232,162,.07),transparent 70%);animation:bd1 14s ease-in-out infinite alternate;}
+.blob2{width:400px;height:400px;bottom:-120px;right:-100px;background:radial-gradient(circle,rgba(74,143,255,.08),transparent 70%);animation:bd2 18s ease-in-out infinite alternate;}
+@keyframes bd1{to{transform:translate(80px,60px);}}
+@keyframes bd2{to{transform:translate(-70px,-50px);}}
+.shell{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:0 28px 100px;}
+
+/* HEADER */
+header{padding:36px 0 28px;display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--border);margin-bottom:36px;}
+.logo-wrap{display:flex;flex-direction:column;gap:8px;}
+.badge{display:inline-flex;align-items:center;gap:7px;background:rgba(45,232,162,.07);border:1px solid rgba(45,232,162,.18);border-radius:100px;padding:4px 14px;font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:2.5px;width:fit-content;}
+.badge-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+h1{font-size:clamp(26px,3.5vw,42px);font-weight:800;letter-spacing:-1px;color:#fff;line-height:1.1;}
+h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-right{text-align:right;font-family:var(--mono);font-size:11px;color:var(--soft);line-height:2.2;}
+.header-right b{color:var(--accent);font-weight:500;}
+
+/* GRID */
+.main-grid{display:grid;grid-template-columns:420px 1fr;gap:24px;align-items:start;}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;position:relative;overflow:hidden;margin-bottom:20px;}
+.card:last-child{margin-bottom:0;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(45,232,162,.25),transparent);}
+.card-title{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.card-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* FORM */
+.field{margin-bottom:14px;}
+.field label{display:block;font-family:var(--mono);font-size:10px;color:var(--soft);letter-spacing:1.2px;margin-bottom:6px;}
+input[type=text],input[type=number],select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;-webkit-appearance:none;}
+input:focus,select:focus{border-color:rgba(45,232,162,.45);box-shadow:0 0 0 3px rgba(45,232,162,.07);}
+input::placeholder{color:var(--soft);opacity:.6;}
+select option{background:#0d1018;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* mode toggle */
+.mode-toggle{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;}
+.mode-btn{flex:1;padding:8px 0;background:transparent;border:none;font-family:var(--mono);font-size:12px;color:var(--soft);cursor:pointer;transition:all .2s;}
+.mode-btn.active{background:var(--card2);color:var(--accent);border-bottom:2px solid var(--accent);}
+
+/* strict toggle */
+.strict-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;user-select:none;transition:border-color .2s;}
+.strict-row:hover{border-color:rgba(45,232,162,.3);}
+.toggle-track{width:36px;height:20px;background:var(--border2);border-radius:100px;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle-track::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;}
+.strict-row.on .toggle-track{background:var(--accent);}
+.strict-row.on .toggle-track::after{transform:translateX(16px);}
+.strict-label{font-family:var(--mono);font-size:12px;color:var(--text2);}
+.strict-label b{color:var(--text);font-weight:500;}
+.strict-badge{margin-left:auto;padding:2px 8px;font-family:var(--mono);font-size:9px;letter-spacing:1px;border-radius:100px;border:1px solid;}
+.strict-badge.hard{color:var(--warn);border-color:rgba(255,95,95,.3);background:rgba(255,95,95,.07);}
+.strict-badge.soft{color:var(--accent3);border-color:rgba(240,160,48,.3);background:rgba(240,160,48,.07);}
+
+/* task list */
+.task-list{display:flex;flex-direction:column;gap:8px;margin-top:14px;max-height:220px;overflow-y:auto;}
+.task-list::-webkit-scrollbar{width:4px;}
+.task-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.task-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;animation:slideIn .25s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.task-item-name{font-size:13px;font-weight:600;color:#fff;flex:1;}
+.task-item-meta{font-family:var(--mono);font-size:10px;color:var(--soft);margin-top:2px;}
+.tag{padding:2px 8px;border-radius:100px;font-family:var(--mono);font-size:9px;letter-spacing:1px;border:1px solid;white-space:nowrap;}
+.tag-high{color:#ff8888;border-color:rgba(255,136,136,.3);background:rgba(255,136,136,.07);}
+.tag-medium{color:var(--accent3);border-color:rgba(240,160,48,.3);background:rgba(240,160,48,.07);}
+.tag-low{color:var(--accent);border-color:rgba(45,232,162,.3);background:rgba(45,232,162,.07);}
+.tag-hard{color:var(--warn);border-color:rgba(255,95,95,.3);background:rgba(255,95,95,.07);}
+.tag-soft{color:var(--accent3);border-color:rgba(240,160,48,.25);background:rgba(240,160,48,.06);}
+.del-btn{background:transparent;border:none;color:var(--border2);cursor:pointer;font-size:18px;line-height:1;padding:2px 4px;border-radius:4px;transition:color .2s;flex-shrink:0;}
+.del-btn:hover{color:var(--warn);}
+.empty-tasks{padding:16px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--soft);border:1px dashed var(--border);border-radius:8px;margin-top:10px;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 22px;border-radius:9px;border:none;font-family:var(--mono);font-size:13px;cursor:pointer;transition:all .2s;font-weight:500;}
+.btn-primary{background:var(--accent);color:#050a0a;width:100%;margin-top:6px;box-shadow:0 0 24px rgba(45,232,162,.2);}
+.btn-primary:hover{background:#3ffbb5;box-shadow:0 0 32px rgba(45,232,162,.3);transform:translateY(-1px);}
+.btn-primary:active{transform:translateY(0);}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.btn-add{background:rgba(45,232,162,.08);color:var(--accent);border:1px solid rgba(45,232,162,.2);width:100%;margin-top:4px;}
+.btn-add:hover{background:rgba(45,232,162,.13);}
+
+/* AVAILABILITY */
+.avail-section{padding-top:0;}
+.cap-bar{height:6px;background:var(--surface);border-radius:100px;margin-top:8px;overflow:hidden;border:1px solid var(--border);}
+.cap-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease;}
+.cap-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--soft);margin-top:4px;}
+
+/* blocked days */
+.days-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px;}
+.day-chip{padding:7px 4px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:7px;font-family:var(--mono);font-size:10px;color:var(--soft);cursor:pointer;transition:all .2s;user-select:none;}
+.day-chip.blocked{background:rgba(255,95,95,.08);border-color:rgba(255,95,95,.3);color:var(--warn);}
+
+/* OUTPUT */
+.output-col{display:flex;flex-direction:column;gap:0;}
+.output-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:380px;gap:16px;color:var(--soft);}
+.output-empty .icon{font-size:52px;opacity:.25;}
+.output-empty p{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-align:center;line-height:2;}
+
+/* metrics */
+.metrics{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.metric{padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;flex:1;min-width:90px;}
+.metric-val{font-size:22px;font-weight:700;color:#fff;}
+.metric-val.green{color:var(--accent);}
+.metric-val.blue{color:var(--accent2);}
+.metric-val.orange{color:var(--accent3);}
+.metric-label{color:var(--soft);font-size:9px;letter-spacing:1.5px;}
+
+/* schedule table */
+.output-scroll{max-height:320px;overflow-y:auto;}
+.output-scroll::-webkit-scrollbar{width:4px;}
+.output-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.schedule-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;}
+.schedule-table th{padding:10px 16px;text-align:left;background:var(--surface);color:var(--soft);font-size:10px;letter-spacing:1.5px;border-bottom:1px solid var(--border);}
+.schedule-table td{padding:11px 16px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle;}
+.schedule-table tr:last-child td{border-bottom:none;}
+.schedule-table tr:hover td{background:rgba(255,255,255,.015);}
+.day-cell{color:var(--accent);font-weight:500;white-space:nowrap;}
+.task-cell{color:#fff;font-weight:600;}
+.hours-bar-wrap{display:flex;align-items:center;gap:10px;}
+.hours-mini-bar{flex:1;height:4px;background:var(--surface);border-radius:100px;overflow:hidden;max-width:70px;}
+.hours-mini-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.hours-val{color:var(--accent);white-space:nowrap;font-weight:500;}
+
+/* status */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;}
+.status-chip{padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+.status-chip-name{font-size:13px;font-weight:600;color:#fff;margin-bottom:4px;}
+.status-chip-meta{font-family:var(--mono);font-size:10px;color:var(--soft);}
+.status-done{border-color:rgba(45,232,162,.25);background:rgba(45,232,162,.04);}
+.status-done .status-chip-name::after{content:' ✓';color:var(--accent);}
+
+/* warnings */
+.warn-list,.suggest-list{display:flex;flex-direction:column;gap:8px;}
+.warn-item{padding:12px 16px;border-radius:9px;font-family:var(--mono);font-size:12px;line-height:1.7;}
+.warn-item.error{background:rgba(255,95,95,.07);border:1px solid rgba(255,95,95,.2);color:#ffaaaa;}
+.warn-item.suggest{background:rgba(74,143,255,.07);border:1px solid rgba(74,143,255,.2);color:#a0c4ff;}
+.warn-item.ok{background:rgba(45,232,162,.07);border:1px solid rgba(45,232,162,.2);color:var(--accent);}
+.warn-icon{margin-right:6px;}
+.suggest-header{font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:2px;margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
+.suggest-header::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* explanation */
+.exp-line{padding:10px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text2);line-height:1.7;display:flex;gap:10px;align-items:flex-start;}
+.exp-line:last-child{border-bottom:none;}
+.exp-bullet{color:var(--accent);flex-shrink:0;margin-top:1px;}
+
+/* spinner */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(45,232,162,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* today banner */
+.today-banner{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;margin-bottom:8px;
+  background:rgba(45,232,162,.06);border:1px solid rgba(45,232,162,.18);
+  border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--accent);
+}
+.today-banner b{color:#fff;}
+.today-dot{width:7px;height:7px;background:var(--accent);border-radius:50%;flex-shrink:0;animation:blink 2s ease-in-out infinite;}
+.day-chip.today-chip{border-color:var(--accent);color:var(--accent);background:rgba(45,232,162,.08);position:relative;}
+.day-chip.today-chip::after{content:'today';position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--accent);white-space:nowrap;letter-spacing:.5px;}
+.days-grid{margin-bottom:18px;}
+
+
+/* blocked warning inline */
+.blocked-note{font-family:var(--mono);font-size:10px;color:var(--soft);margin-top:-12px;margin-bottom:6px;opacity:.8;}
+.energy-advisory{margin-top:8px;padding:9px 13px;border-radius:8px;font-family:var(--mono);font-size:11px;line-height:1.6;display:none;}
+.energy-advisory.warn{background:rgba(240,160,48,.07);border:1px solid rgba(240,160,48,.25);color:#f5c97a;}
+.energy-advisory.ok{background:rgba(45,232,162,.06);border:1px solid rgba(45,232,162,.2);color:var(--accent);}
+.energy-advisory.tip{background:rgba(74,143,255,.07);border:1px solid rgba(74,143,255,.2);color:#a0c4ff;}
+
+/* cap breakdown */
+.cap-breakdown{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+.cap-pill{padding:4px 10px;border-radius:100px;font-family:var(--mono);font-size:10px;border:1px solid;}
+.cap-pill.energy{color:var(--accent3);border-color:rgba(240,160,48,.3);background:rgba(240,160,48,.06);}
+.cap-pill.work{color:var(--accent2);border-color:rgba(74,143,255,.3);background:rgba(74,143,255,.06);}
+.cap-pill.result{color:#fff;border-color:rgba(45,232,162,.35);background:rgba(45,232,162,.08);font-weight:600;}
+
+/* PDF button */
+.btn-pdf{background:rgba(74,143,255,.1);color:var(--accent2);border:1px solid rgba(74,143,255,.25);display:none;}
+.btn-pdf:hover{background:rgba(74,143,255,.18);border-color:rgba(74,143,255,.45);}
+.pdf-row{display:flex;gap:10px;margin-bottom:0;}
+.pdf-row .btn-primary{flex:1;margin-top:0;}
+
+</style>
+</head>
+<body>
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<div class="shell">
+
+  <header>
+    <div class="logo-wrap">
+      <div class="badge"><span class="badge-dot"></span>A* SEARCH ENGINE</div>
+      <h1>AI Student<br/><em>Task Planner</em></h1>
+    </div>
+    <div class="header-right">
+      <div>Algorithm &nbsp;<b>A* (Heuristic Search)</b></div>
+      <div>Constraints &nbsp;<b>HARD + SOFT Deadlines</b></div>
+      <div>Strategy &nbsp;<b>Earliest-First Packing</b></div>
+      <div>Priority &nbsp;<b>Urgency Score Ordering</b></div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- ── LEFT INPUT ── -->
+    <div>
+      <div class="card">
+        <div class="card-title">Add Task</div>
+
+        <div class="field">
+          <label>TASK NAME</label>
+          <input type="text" id="taskName" placeholder="e.g. Math Assignment"/>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <label>PRIORITY</label>
+            <select id="priority">
+              <option value="High">⬆ High</option>
+              <option value="Medium" selected>➡ Medium</option>
+              <option value="Low">⬇ Low</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>TASK TYPE (optional)</label>
+            <select id="taskType">
+              <option value="Study">Study</option>
+              <option value="Assignment">Assignment</option>
+              <option value="Revision">Revision</option>
+              <option value="Reading">Reading</option>
+              <option value="Practice">Practice</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <label>DEADLINE (days)</label>
+            <input type="number" id="deadline" min="1" max="30" placeholder="e.g. 5"/>
+          </div>
+          <div class="field">
+            <label>DEADLINE TYPE</label>
+            <div class="strict-row" id="strictRow" onclick="toggleStrict()">
+              <div class="toggle-track"></div>
+              <span class="strict-label"><b id="strictLabel">Soft</b> Deadline</span>
+              <span class="strict-badge soft" id="strictBadge">SOFT</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>TASK LENGTH — CHOOSE ONE METHOD</label>
+          <div class="mode-toggle">
+            <button class="mode-btn active" id="modeHoursBtn" onclick="setMode('hours')">⏱ Exact Hours</button>
+            <button class="mode-btn" id="modeDescBtn" onclick="setMode('desc')">📏 Description</button>
+          </div>
+          <div id="hoursInput">
+            <input type="number" id="approxHours" min="0.5" step="0.5" placeholder="e.g. 3.5 hours"/>
+          </div>
+          <div id="descInput" style="display:none;">
+            <select id="descLength">
+              <option value="">— Select length —</option>
+              <option value="Very Short">Very Short  (~1h)</option>
+              <option value="Short">Short  (~2h)</option>
+              <option value="Medium">Medium  (~4h)</option>
+              <option value="Long">Long  (~6h)</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn-add" onclick="addTask()">+ Add Task to Queue</button>
+
+        <div id="emptyTasksMsg" class="empty-tasks">No tasks added yet. Add at least one task above.</div>
+        <div class="task-list" id="taskList" style="display:none;"></div>
+      </div>
+
+      <!-- AVAILABILITY -->
+      <div class="card">
+        <div class="card-title">Availability & Limits</div>
+
+        <div class="row2">
+          <div class="field">
+            <label>ENERGY LEVEL</label>
+            <select id="energyLevel" onchange="updateCapacity()">
+              <option value="Tired">😴 Tired</option>
+              <option value="Normal" selected>😐 Normal</option>
+              <option value="Energetic">⚡ Energetic</option>
+            </select>
+            <div class="energy-advisory" id="energyAdvisory"></div>
+          </div>
+          <div class="field">
+            <label>DAILY WORK HOURS (1–8)</label>
+            <select id="workUntil" onchange="updateCapacity()">
+              <option value="1">1 h / day</option>
+              <option value="2">2 h / day</option>
+              <option value="3">3 h / day</option>
+              <option value="4">4 h / day</option>
+              <option value="5">5 h / day</option>
+              <option value="6">6 h / day</option>
+              <option value="7">7 h / day</option>
+              <option value="8" selected>8 h / day</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <div class="cap-row">
+            <span>Effective daily capacity</span>
+            <span id="capVal" style="color:var(--accent);font-weight:600;">8 h/day</span>
+          </div>
+          <div class="cap-bar"><div class="cap-fill" id="capFill" style="width:100%"></div></div>
+          <div class="cap-breakdown" id="capBreakdown"></div>
+        </div>
+
+        <div class="field">
+          <label>BLOCKED DAYS (click to toggle unavailable)</label>
+          <div class="today-banner" id="todayBanner"></div>
+          <div class="days-grid" id="daysGrid">
+            <div class="day-chip" data-day="1" onclick="toggleDay(this)">Mon</div>
+            <div class="day-chip" data-day="2" onclick="toggleDay(this)">Tue</div>
+            <div class="day-chip" data-day="3" onclick="toggleDay(this)">Wed</div>
+            <div class="day-chip" data-day="4" onclick="toggleDay(this)">Thu</div>
+            <div class="day-chip" data-day="5" onclick="toggleDay(this)">Fri</div>
+            <div class="day-chip" data-day="6" onclick="toggleDay(this)">Sat</div>
+            <div class="day-chip" data-day="7" onclick="toggleDay(this)">Sun</div>
+          </div>
+          <div class="blocked-note" id="blockedNote"></div>
+        </div>
+
+        <div class="pdf-row" style="margin-top:6px;">
+          <button class="btn btn-primary" id="generateBtn" onclick="generateSchedule()">
+            ▶ Generate Schedule
+          </button>
+          <button class="btn btn-pdf" id="pdfBtn" onclick="downloadPDF()" title="Download Schedule as PDF">
+            ⬇ PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT OUTPUT ── -->
+    <div class="output-col" id="outputCol">
+      <div class="card">
+        <div class="output-empty">
+          <div class="icon">🧠</div>
+          <p>ADD TASKS & SET YOUR AVAILABILITY<br/>THEN CLICK GENERATE SCHEDULE<br/><br/>THE A* PLANNER WILL FIND THE<br/>OPTIMAL TASK ORDER & SCHEDULE</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS (mirrors your backend exactly) ──
+const ENERGY_MAP   = { Tired: 2, Normal: 3, Energetic: 5 };
+const LENGTH_MAP   = { 'Very Short': 1, Short: 2, Medium: 4, Long: 6 };
+const PRIORITY_W   = { High: 3, Medium: 2, Low: 1 };
+const PRIORITY_P   = { High: 5, Medium: 3, Low: 1 };
+const SOFT_PENALTY = 4;
+
+// ── DATE HELPERS ──
+const TODAY        = new Date();
+TODAY.setHours(0, 0, 0, 0);
+const DAY_NAMES    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTH_NAMES  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// JS getDay(): 0=Sun,1=Mon...6=Sat  →  our blocked-day convention: 1=Mon...7=Sun
+function jsDowToOurs(jsDay) { return jsDay === 0 ? 7 : jsDay; }
+
+// Add `n` calendar days to a base Date
+function addDays(base, n) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+// Format a Date as "Tue 24 Mar"
+function fmtDate(d) {
+  return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+}
+
+// Format a Date as "Tue 24 Mar 2025" (for PDF)
+function fmtDateLong(d) {
+  return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Highlight today's chip and show banner
+function initTodayUI() {
+  const todayDow = jsDowToOurs(TODAY.getDay()); // 1–7
+  document.querySelectorAll('.day-chip').forEach(chip => {
+    if (+chip.dataset.day === todayDow) chip.classList.add('today-chip');
+  });
+  const banner = document.getElementById('todayBanner');
+  banner.innerHTML = `<span class="today-dot"></span>Schedule starts <b>today</b>: <b>${fmtDate(TODAY)}</b> — dates are calculated from now`;
+}
+initTodayUI();
+
+// ── STATE ──
+let tasks = [];
+let lengthMode = 'hours';
+let strictOn = false;
+let blockedDays = [];
+
+// ── MODE TOGGLE ──
+function setMode(m) {
+  lengthMode = m;
+  document.getElementById('modeHoursBtn').classList.toggle('active', m === 'hours');
+  document.getElementById('modeDescBtn').classList.toggle('active', m === 'desc');
+  document.getElementById('hoursInput').style.display = m === 'hours' ? '' : 'none';
+  document.getElementById('descInput').style.display  = m === 'desc'  ? '' : 'none';
+}
+
+// ── STRICT TOGGLE ──
+function toggleStrict() {
+  strictOn = !strictOn;
+  const row   = document.getElementById('strictRow');
+  const badge = document.getElementById('strictBadge');
+  const lbl   = document.getElementById('strictLabel');
+  row.classList.toggle('on', strictOn);
+  badge.className = 'strict-badge ' + (strictOn ? 'hard' : 'soft');
+  badge.textContent = strictOn ? 'HARD' : 'SOFT';
+  lbl.textContent = strictOn ? 'Strict' : 'Soft';
+}
+
+// ── BLOCKED DAYS ──
+function toggleDay(el) {
+  el.classList.toggle('blocked');
+  const d = +el.dataset.day;
+  blockedDays = el.classList.contains('blocked')
+    ? [...blockedDays, d]
+    : blockedDays.filter(x => x !== d);
+  const note = document.getElementById('blockedNote');
+  note.textContent = blockedDays.length
+    ? `${blockedDays.length} day(s) blocked — skipped during scheduling`
+    : '';
+}
+
+// ── CAPACITY (energy is advisory, not a hard cap) ──
+function updateCapacity() {
+  const energy   = document.getElementById('energyLevel').value;
+  const work     = +document.getElementById('workUntil').value;
+  const energyCap = ENERGY_MAP[energy];           // backend limit
+  const advisory  = document.getElementById('energyAdvisory');
+  const breakdown = document.getElementById('capBreakdown');
+
+  // daily_capacity = work hours (user controls this fully)
+  // energy is advisory — shown as a warning if overcommitting
+  const cap = work;
+  document.getElementById('capVal').textContent  = cap + ' h/day';
+  document.getElementById('capFill').style.width = (cap / 8 * 100) + '%';
+
+  // Pill breakdown
+  breakdown.innerHTML = `
+    <span class="cap-pill energy">Energy cap: ${energyCap}h</span>
+    <span class="cap-pill work">Work limit: ${work}h</span>
+    <span class="cap-pill result">→ Scheduled: ${cap}h/day</span>`;
+
+  // Advisory message
+  advisory.style.display = 'block';
+  if (work > energyCap) {
+    advisory.className = 'energy-advisory warn';
+    advisory.innerHTML = `⚠ You're scheduling ${work}h/day but your energy level suggests ~${energyCap}h. You may feel fatigued — consider reducing work hours or switching to Energetic.`;
+  } else if (work === energyCap) {
+    advisory.className = 'energy-advisory ok';
+    advisory.innerHTML = `✓ Work hours match your energy level perfectly (${work}h/day).`;
+  } else {
+    advisory.className = 'energy-advisory tip';
+    advisory.innerHTML = `💡 You have energy for up to ${energyCap}h/day — you're scheduling ${work}h. You could increase work hours to finish tasks faster.`;
+  }
+}
+updateCapacity();
+
+// ── ADD TASK ──
+function addTask() {
+  const name      = document.getElementById('taskName').value.trim();
+  const priority  = document.getElementById('priority').value;
+  const taskType  = document.getElementById('taskType').value;
+  const dlStr     = document.getElementById('deadline').value;
+
+  if (!name)            { flashEl('taskName', 'Task name required'); return; }
+  if (!dlStr || +dlStr < 1) { flashEl('deadline', 'Min 1 day'); return; }
+
+  let approxHours = null, descLength = null;
+  if (lengthMode === 'hours') {
+    const h = document.getElementById('approxHours').value;
+    if (!h || +h <= 0) { flashEl('approxHours', 'Enter hours > 0'); return; }
+    approxHours = parseFloat(h);
+  } else {
+    descLength = document.getElementById('descLength').value;
+    if (!descLength) { flashEl('descLength', 'Select a length'); return; }
+  }
+
+  const totalHours = approxHours !== null ? approxHours : LENGTH_MAP[descLength];
+
+  tasks.push({
+    id: Date.now(),
+    name, priority, taskType,
+    deadline_days: +dlStr,
+    strict_deadline: strictOn,
+    approximate_hours: approxHours,
+    descriptive_length: descLength,
+    total_hours: totalHours
+  });
+
+  renderTaskList();
+
+  // Reset form
+  document.getElementById('taskName').value = '';
+  document.getElementById('deadline').value = '';
+  document.getElementById('approxHours').value = '';
+  document.getElementById('descLength').value = '';
+  if (strictOn) toggleStrict();
+}
+
+function flashEl(id, msg) {
+  const el = document.getElementById(id);
+  el.style.borderColor = 'var(--warn)';
+  el.style.boxShadow   = '0 0 0 3px rgba(255,95,95,.1)';
+  const prev = el.placeholder;
+  el.placeholder = msg;
+  setTimeout(() => { el.style.borderColor=''; el.style.boxShadow=''; el.placeholder=prev; }, 2000);
+}
+
+function tagHTML(cls, text) {
+  return `<span class="tag ${cls}">${text}</span>`;
+}
+
+function renderTaskList() {
+  const list  = document.getElementById('taskList');
+  const empty = document.getElementById('emptyTasksMsg');
+  if (!tasks.length) { list.style.display='none'; empty.style.display=''; return; }
+  list.style.display = 'flex';
+  empty.style.display = 'none';
+  const pcls = { High:'tag-high', Medium:'tag-medium', Low:'tag-low' };
+  list.innerHTML = tasks.map(t => {
+    const len = t.approximate_hours !== null ? t.approximate_hours + 'h' : t.descriptive_length;
+    return `
+    <div class="task-item">
+      <div style="flex:1;min-width:0;">
+        <div class="task-item-name">${t.name}</div>
+        <div class="task-item-meta">📅 ${t.deadline_days}d &nbsp;⏱ ${len} &nbsp;${t.taskType}</div>
+      </div>
+      ${tagHTML(pcls[t.priority], t.priority.toUpperCase())}
+      ${t.strict_deadline ? tagHTML('tag-hard','HARD') : tagHTML('tag-soft','SOFT')}
+      <button class="del-btn" onclick="removeTask(${t.id})">×</button>
+    </div>`;
+  }).join('');
+}
+
+function removeTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  renderTaskList();
+}
+
+// ── PLANNER LOGIC (mirrors your Python pipeline) ──
+
+// ── GET CAPACITY (work hours — user's actual limit) ──
+function getCapacity() {
+  return +document.getElementById('workUntil').value;
+}
+
+// mirrors feasibility_checker.py
+function feasibilityCheck(tasks, dailyCap) {
+  const warnings = [], suggestions = [];
+
+  // check_strict_deadlines — HARD constraints only
+  for (const t of tasks) {
+    if (t.strict_deadline) {
+      const maxPossible = t.deadline_days * dailyCap;
+      if (t.total_hours > maxPossible) {
+        warnings.push(
+          `Strict deadline violation risk: Task '${t.name}' requires ${t.total_hours}h but only ${maxPossible}h available before deadline.`
+        );
+      }
+    }
+  }
+
+  // check_total_feasibility
+  const totalReq   = tasks.reduce((s, t) => s + t.total_hours, 0);
+  const totalAvail = dailyCap * 30;
+  if (totalReq > totalAvail) {
+    warnings.push(`Overall infeasibility: Total required hours (${totalReq}h) exceed available hours (${totalAvail}h over 30 days).`);
+  }
+
+  // generate_suggestions
+  if (warnings.length) {
+    for (const t of tasks) {
+      if (t.strict_deadline) {
+        const reqPerDay = (t.total_hours / t.deadline_days).toFixed(2);
+        if (+reqPerDay > dailyCap) {
+          suggestions.push(
+            `For task '${t.name}': Increase daily availability to ~${reqPerDay}h/day, reduce task length, or relax deadline strictness.`
+          );
+        }
+      }
+    }
+  }
+
+  return { warnings, suggestions };
+}
+
+// urgency score — mirrors constraint_rules.py logic
+function urgencyScore(t) {
+  return PRIORITY_W[t.priority] * 10 + (30 - Math.min(t.deadline_days, 30));
+}
+
+// mirrors interpreter.py: interpret_task — infers deadline_type
+function inferDeadlineType(t) {
+  return t.strict_deadline ? 'HARD' : 'SOFT';
+}
+
+// A* greedy packing — mirrors astar.py behaviour
+// Sort: strict+hard first, then by urgency_score desc
+// slot = calendar-day offset from TODAY (0 = today, 1 = tomorrow, …)
+function astarSchedule(tasks, dailyCap, blocked) {
+  const sorted = [...tasks].sort((a, b) => {
+    if (a.strict_deadline !== b.strict_deadline) return b.strict_deadline - a.strict_deadline;
+    return urgencyScore(b) - urgencyScore(a);
+  });
+
+  const schedule  = {};   // offset -> [{name, hours, date}]
+  const dayUsage  = {};   // offset -> hours used
+  const taskDays  = {};   // name -> [Date objects]
+  const remaining = {};
+  for (const t of sorted) remaining[t.name] = t.total_hours;
+
+  let offset = 0;         // 0 = today
+  const MAX_OFFSET = 90;  // look up to 90 calendar days ahead
+
+  while (Object.values(remaining).some(r => r > 0) && offset < MAX_OFFSET) {
+    const date = addDays(TODAY, offset);
+    const dow  = jsDowToOurs(date.getDay());   // 1=Mon … 7=Sun
+
+    if (blocked.includes(dow)) { offset++; continue; }
+
+    dayUsage[offset] = dayUsage[offset] || 0;
+    const avail = dailyCap - dayUsage[offset];
+    if (avail <= 0) { offset++; continue; }
+
+    let assigned = false;
+    for (const t of sorted) {
+      if (remaining[t.name] <= 0) continue;
+      const give = Math.min(remaining[t.name], avail);
+      if (give <= 0) continue;
+
+      schedule[offset] = schedule[offset] || [];
+      schedule[offset].push({ name: t.name, hours: give, date });
+      dayUsage[offset] += give;
+      remaining[t.name] -= give;
+      taskDays[t.name] = taskDays[t.name] || [];
+      if (!taskDays[t.name].some(d => d.getTime() === date.getTime()))
+        taskDays[t.name].push(date);
+      assigned = true;
+      break;
+    }
+
+    if (!assigned || dayUsage[offset] >= dailyCap) offset++;
+  }
+
+  return { schedule, remaining, taskDays, sortedOrder: sorted };
+}
+
+// mirrors explanation_engine.py
+function generateExplanation(sorted, taskDays, dailyCap, remaining) {
+  const lines = [];
+
+  // explain_task_order
+  if (sorted.length > 1) {
+    const top = sorted[0];
+    lines.push(`Task '${top.name}' was prioritized because it has higher urgency (priority: ${top.priority}, deadline: ${top.deadline_days}d${top.strict_deadline ? ', STRICT/HARD' : ''}).`);
+  }
+
+  // explain_task_splitting
+  for (const [name, dates] of Object.entries(taskDays)) {
+    if (dates.length > 1) {
+      const dateStr = dates.map(d => fmtDate(d)).join(', ');
+      lines.push(`Task '${name}' was split across ${dates.length} days (${dateStr}) to balance workload and respect the ${dailyCap}h/day capacity limit.`);
+    }
+  }
+
+  // explain_deadlines
+  for (const t of sorted) {
+    if (t.strict_deadline) {
+      lines.push(`Task '${t.name}' was scheduled early because it has a STRICT (HARD) deadline — it is a hard constraint.`);
+    } else {
+      lines.push(`Task '${t.name}' was scheduled flexibly because its deadline is SOFT — can be crossed with a penalty.`);
+    }
+  }
+
+  // explain_efficiency
+  if (Object.keys(taskDays).length > 0) {
+    lines.push(`The A* planner avoided idle time by packing tasks as early as possible while respecting the ${dailyCap}h/day capacity limit.`);
+  }
+
+  return lines;
+}
+
+// ── LAST RESULT (for PDF export) ──
+let lastResult = null;
+
+// ── GENERATE SCHEDULE ──
+function generateSchedule() {
+  if (!tasks.length) { alert('Please add at least one task first.'); return; }
+
+  const btn = document.getElementById('generateBtn');
+  btn.innerHTML = '<div class="spinner"></div>&nbsp;Running A* Search…';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    const dailyCap  = getCapacity();
+    const feasResult = feasibilityCheck(tasks, dailyCap);
+    const strictBlock = feasResult.warnings.some(w => w.startsWith('Strict deadline violation risk'));
+
+    const col = document.getElementById('outputCol');
+    col.innerHTML = '';
+
+    if (strictBlock) {
+      // mirrors main.py strict_blocking branch
+      col.innerHTML =
+        cardHTML('⚠ Schedule Blocked — Hard Constraint Violated',
+          `<div class="warn-list">
+            <div class="warn-item error"><span class="warn-icon">⛔</span>The planner could not generate a schedule because one or more strict deadlines cannot be satisfied with the given daily capacity.</div>
+          </div>`) +
+        warningsCardHTML(feasResult, true);
+    } else {
+      const { schedule, remaining, taskDays, sortedOrder } =
+        astarSchedule(tasks, dailyCap, blockedDays);
+
+      const totalDays  = Object.keys(schedule).length;
+      const totalHours = tasks.reduce((s, t) => s + t.total_hours, 0);
+      const doneCount  = tasks.filter(t => (remaining[t.name] || 0) <= 0).length;
+      const expLines   = generateExplanation(sortedOrder, taskDays, dailyCap, remaining);
+
+      // compute end date (last scheduled offset)
+      const lastOffset = totalDays > 0 ? Math.max(...Object.keys(schedule).map(Number)) : 0;
+      const endDate    = addDays(TODAY, lastOffset);
+
+      // store for PDF
+      lastResult = { schedule, remaining, taskDays, sortedOrder, totalDays, totalHours, doneCount, dailyCap, feasResult, expLines, endDate };
+      document.getElementById('pdfBtn').style.display = 'inline-flex';
+
+      col.innerHTML =
+        metricsHTML(totalDays, totalHours, dailyCap, doneCount, tasks.length, endDate) +
+        scheduleCardHTML(schedule, totalHours, dailyCap, endDate) +
+        statusCardHTML(tasks, remaining) +
+        (feasResult.warnings.length ? warningsCardHTML(feasResult, false) : okCardHTML()) +
+        explanationCardHTML(expLines);
+    }
+
+    btn.innerHTML = '▶ Generate Schedule';
+    btn.disabled = false;
+  }, 500);
+}
+
+function cardHTML(title, inner) {
+  return `<div class="card"><div class="card-title">${title}</div>${inner}</div>`;
+}
+
+function metricsHTML(days, hours, cap, done, total, endDate) {
+  const endStr = endDate ? fmtDate(endDate) : '—';
+  const startStr = fmtDate(TODAY);
+  return `<div class="metrics">
+    <div class="metric"><div class="metric-val green" style="font-size:14px;line-height:1.3;">${startStr}<br/><span style="color:var(--soft);font-size:11px;">→ ${endStr}</span></div><div class="metric-label">DATE RANGE</div></div>
+    <div class="metric"><div class="metric-val green">${days}</div><div class="metric-label">DAYS USED</div></div>
+    <div class="metric"><div class="metric-val blue">${hours}h</div><div class="metric-label">TOTAL WORK</div></div>
+    <div class="metric"><div class="metric-val orange">${cap}h</div><div class="metric-label">DAILY CAP</div></div>
+    <div class="metric"><div class="metric-val green">${done}/${total}</div><div class="metric-label">COMPLETED</div></div>
+  </div>`;
+}
+
+function scheduleCardHTML(schedule, totalHours, dailyCap, endDate) {
+  const rows = Object.keys(schedule).sort((a,b)=>+a-+b).flatMap(offset =>
+    schedule[offset].map(({name, hours, date}) => {
+      const barPct  = Math.min(Math.round(hours / dailyCap * 100), 100);
+      const isToday = date.getTime() === TODAY.getTime();
+      const dateLbl = isToday ? `<span style="color:var(--accent)">Today</span>` : fmtDate(date);
+      return `<tr>
+        <td class="day-cell">${dateLbl}</td>
+        <td class="task-cell">${name}</td>
+        <td><div class="hours-bar-wrap">
+          <div class="hours-mini-bar"><div class="hours-mini-fill" style="width:${barPct}%"></div></div>
+          <span class="hours-val">${hours}h</span>
+        </div></td>
+      </tr>`;
+    })
+  ).join('');
+
+  const rangeNote = endDate
+    ? `<div style="font-family:var(--mono);font-size:10px;color:var(--soft);margin-bottom:12px;">
+        📅 <span style="color:var(--text2);">${fmtDate(TODAY)}</span>
+        <span style="color:var(--border2);margin:0 6px;">→</span>
+        <span style="color:var(--text2);">${fmtDate(endDate)}</span>
+       </div>`
+    : '';
+
+  return cardHTML('Final Schedule',
+    rangeNote +
+    `<div class="output-scroll">
+      <table class="schedule-table">
+        <thead><tr><th>DATE</th><th>TASK</th><th>HOURS</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3" style="color:var(--soft);text-align:center;padding:20px;">No tasks scheduled</td></tr>'}</tbody>
+      </table>
+    </div>`);
+}
+
+function statusCardHTML(tasks, remaining) {
+  const chips = tasks.map(t => {
+    const rem  = remaining[t.name] || 0;
+    const done = rem <= 0;
+    return `<div class="status-chip ${done ? 'status-done' : ''}">
+      <div class="status-chip-name">${t.name}</div>
+      <div class="status-chip-meta">${done ? 'Completed' : `Remaining: ${+rem.toFixed(1)}h`} · ${t.priority}</div>
+    </div>`;
+  }).join('');
+  return cardHTML('Task Status', `<div class="status-grid">${chips}</div>`);
+}
+
+function warningsCardHTML(result, blocking) {
+  const warns = result.warnings.map(w =>
+    `<div class="warn-item error"><span class="warn-icon">⚠</span>${w}</div>`
+  ).join('');
+  const suggs = result.suggestions.length
+    ? `<div class="suggest-header">Suggestions</div><div class="suggest-list">${
+        result.suggestions.map(s =>
+          `<div class="warn-item suggest"><span class="warn-icon">💡</span>${s}</div>`
+        ).join('')
+      }</div>`
+    : '';
+  return cardHTML('Warnings & Suggestions', `<div class="warn-list">${warns}</div>${suggs}`);
+}
+
+function okCardHTML() {
+  return cardHTML('Warnings & Suggestions',
+    `<div class="warn-item ok"><span class="warn-icon">✓</span>No constraint violations detected. All deadlines are achievable within current capacity.</div>`);
+}
+
+function explanationCardHTML(lines) {
+  const items = lines.map(l =>
+    `<div class="exp-line"><span class="exp-bullet">—</span><span>${l}</span></div>`
+  ).join('');
+  return cardHTML('A* Explanation Trace', `<div>${items}</div>`);
+}
+
+// ── PDF EXPORT ──
+function downloadPDF() {
+  if (!lastResult) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const { schedule, remaining, taskDays, sortedOrder, totalDays, totalHours, doneCount, dailyCap, feasResult, expLines, endDate } = lastResult;
+  const energy   = document.getElementById('energyLevel').value;
+  const workH    = document.getElementById('workUntil').value;
+  const W = doc.internal.pageSize.getWidth();
+  const now      = fmtDateLong(new Date());
+  const startStr = fmtDateLong(TODAY);
+  const endStr   = endDate ? fmtDateLong(endDate) : '—';
+
+  // ── HEADER BAR ──
+  doc.setFillColor(13, 16, 24);
+  doc.rect(0, 0, W, 42, 'F');
+  doc.setFillColor(45, 232, 162);
+  doc.rect(0, 0, 4, 42, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text('AI Student Task Planner', 12, 14);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(120, 144, 184);
+  doc.text('A* Search Engine  ·  Schedule Report', 12, 21);
+  doc.text(`Generated: ${now}`, 12, 27);
+  doc.setTextColor(45, 232, 162);
+  doc.text(`Schedule: ${startStr}  →  ${endStr}`, 12, 34);
+
+  // right side summary
+  doc.setFontSize(8);
+  doc.setTextColor(45, 232, 162);
+  doc.text(`${totalDays} days used`, W - 14, 14, { align: 'right' });
+  doc.setTextColor(74, 143, 255);
+  doc.text(`${totalHours}h total work`, W - 14, 20, { align: 'right' });
+  doc.setTextColor(240, 160, 48);
+  doc.text(`${dailyCap}h / day capacity`, W - 14, 26, { align: 'right' });
+  doc.setTextColor(45, 232, 162);
+  doc.text(`${doneCount}/${tasks.length} tasks completed`, W - 14, 32, { align: 'right' });
+
+  let y = 50;
+
+  // ── SUMMARY METRICS ROW ──
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(45, 232, 162);
+  doc.text('SCHEDULE SUMMARY', 14, y);
+  y += 5;
+
+  const metrics = [
+    { label: 'Start Date',       val: fmtDate(TODAY),            color: [45,232,162] },
+    { label: 'End Date',         val: endDate ? fmtDate(endDate) : '—', color: [45,232,162] },
+    { label: 'Days Used',        val: String(totalDays),          color: [74,143,255] },
+    { label: 'Total Work',       val: totalHours + 'h',           color: [74,143,255] },
+    { label: 'Daily Capacity',   val: dailyCap + 'h/day',         color: [240,160,48] },
+    { label: 'Tasks Completed',  val: `${doneCount}/${tasks.length}`, color: [45,232,162] },
+    { label: 'Energy Level',     val: energy,                     color: [165,148,255] },
+    { label: 'Work Hours Set',   val: workH + 'h/day',            color: [120,144,184] },
+  ];
+  const mW = (W - 30) / 4;
+  metrics.forEach((m, i) => {
+    const mx = 14 + (i % 4) * (mW + 2.5);
+    const my = y + Math.floor(i / 4) * 18;
+    doc.setFillColor(17, 21, 32);
+    doc.roundedRect(mx, my, mW, 14, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...m.color);
+    doc.text(m.val, mx + 3, my + 8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(120, 144, 184);
+    doc.text(m.label.toUpperCase(), mx + 3, my + 12.5);
+  });
+  y += 44;
+
+  // ── FINAL SCHEDULE TABLE ──
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(45, 232, 162);
+  doc.text('FINAL SCHEDULE', 14, y);
+  y += 3;
+
+  const schedRows = Object.keys(schedule).sort((a,b)=>+a-+b).flatMap(offset =>
+    schedule[offset].map(({name, hours, date}) => {
+      const isToday = date.getTime() === TODAY.getTime();
+      return [isToday ? 'Today' : fmtDate(date), name, `${hours}h`];
+    })
+  );
+
+  doc.autoTable({
+    startY: y,
+    head: [['DATE', 'TASK', 'HOURS']],
+    body: schedRows,
+    theme: 'plain',
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 3.5, textColor: [168, 188, 220] },
+    headStyles: { fillColor: [17, 21, 32], textColor: [120, 144, 184], fontSize: 8, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [15, 18, 26] },
+    columnStyles: {
+      0: { textColor: [45, 232, 162], fontStyle: 'bold', cellWidth: 32 },
+      1: { textColor: [255, 255, 255], fontStyle: 'bold' },
+      2: { textColor: [74, 143, 255], cellWidth: 20, halign: 'right' }
+    },
+    margin: { left: 14, right: 14 },
+    tableLineColor: [29, 37, 53],
+    tableLineWidth: 0.2,
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── TASK STATUS TABLE ──
+  if (y > 240) { doc.addPage(); y = 16; }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(45, 232, 162);
+  doc.text('TASK STATUS', 14, y);
+  y += 3;
+
+  const statusRows = tasks.map(t => {
+    const rem  = lastResult.remaining[t.name] || 0;
+    const done = rem <= 0;
+    return [
+      t.name,
+      t.priority,
+      t.strict_deadline ? 'HARD' : 'SOFT',
+      t.total_hours + 'h',
+      `${t.deadline_days}d`,
+      done ? 'Completed' : `Rem: ${+rem.toFixed(1)}h`
+    ];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['TASK', 'PRIORITY', 'DEADLINE TYPE', 'TOTAL HRS', 'DEADLINE', 'STATUS']],
+    body: statusRows,
+    theme: 'plain',
+    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3.2, textColor: [168, 188, 220] },
+    headStyles: { fillColor: [17, 21, 32], textColor: [120, 144, 184], fontSize: 7.5, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [15, 18, 26] },
+    columnStyles: {
+      0: { textColor: [255, 255, 255], fontStyle: 'bold' },
+      1: { textColor: [240, 160, 48] },
+      2: { textColor: [255, 95, 95] },
+      5: { textColor: [45, 232, 162] },
+    },
+    margin: { left: 14, right: 14 },
+    tableLineColor: [29, 37, 53],
+    tableLineWidth: 0.2,
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── WARNINGS ──
+  if (feasResult.warnings.length) {
+    if (y > 245) { doc.addPage(); y = 16; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 95, 95);
+    doc.text('WARNINGS', 14, y); y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    feasResult.warnings.forEach(w => {
+      const lines = doc.splitTextToSize('⚠  ' + w, W - 28);
+      doc.setTextColor(255, 170, 170);
+      doc.text(lines, 14, y);
+      y += lines.length * 5 + 2;
+    });
+    if (feasResult.suggestions.length) {
+      y += 2;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(74, 143, 255);
+      doc.text('SUGGESTIONS', 14, y); y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      feasResult.suggestions.forEach(s => {
+        const lines = doc.splitTextToSize('💡  ' + s, W - 28);
+        doc.setTextColor(160, 196, 255);
+        doc.text(lines, 14, y);
+        y += lines.length * 5 + 2;
+      });
+    }
+    y += 4;
+  }
+
+  // ── EXPLANATION TRACE ──
+  if (y > 240) { doc.addPage(); y = 16; }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(45, 232, 162);
+  doc.text('A* EXPLANATION TRACE', 14, y); y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  expLines.forEach(line => {
+    if (y > 270) { doc.addPage(); y = 16; }
+    const lines = doc.splitTextToSize('—  ' + line, W - 28);
+    doc.setTextColor(168, 188, 220);
+    doc.text(lines, 14, y);
+    y += lines.length * 5 + 1.5;
+  });
+
+  // ── FOOTER ──
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(13, 16, 24);
+    doc.rect(0, doc.internal.pageSize.getHeight() - 10, W, 10, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(60, 80, 110);
+    doc.text('AI Student Task Planner  ·  A* Search Engine', 14, doc.internal.pageSize.getHeight() - 4);
+    doc.text(`Page ${i} of ${pages}`, W - 14, doc.internal.pageSize.getHeight() - 4, { align: 'right' });
+  }
+
+  const safeDate = `${TODAY.getFullYear()}-${String(TODAY.getMonth()+1).padStart(2,'0')}-${String(TODAY.getDate()).padStart(2,'0')}`;
+  doc.save(`task_schedule_${safeDate}.pdf`);
+}
+</script>
+</body>
+</html>
